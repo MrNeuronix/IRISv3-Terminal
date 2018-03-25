@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">IRISv3 Terminal</string>
+
+    <string name="dummy_button">Dummy Button</string>
+    <string name="dummy_content">DUMMY\nCONTENT</string>
+
+    <string name="item1">Item1</string>
+    <string name="item2">Item2</string>
+    <string name="item3">Item3</string>
+    <string name="item4">Item4</string>
+
+</resources>
