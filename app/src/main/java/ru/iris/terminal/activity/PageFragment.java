@@ -88,6 +88,7 @@ public class PageFragment extends Fragment {
                 case TEMP_SENSOR:
                     handler = new TempSensorFragment();
                     break;
+                case DOOR_SENSOR:
                 default:
                     handler = new MainScreenFragment();
             }
