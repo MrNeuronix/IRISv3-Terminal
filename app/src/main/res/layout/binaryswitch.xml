@@ -8,6 +8,7 @@
 
     <TextView
         android:id="@+id/name"
+        android:layout_gravity="center_horizontal|center"
         android:layout_width="407dp"
         android:layout_height="69dp"
         android:layout_marginTop="40dp"
