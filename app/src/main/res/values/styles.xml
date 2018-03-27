@@ -9,11 +9,12 @@
         <item name="android:windowBackground">@color/colorPrimary</item>
         <item name="android:actionBarStyle">@color/colorPrimary</item>
         <item name="android:actionMenuTextColor">@color/white</item>
-        <item name="android:itemTextAppearance">@style/myCustomMenuTextApearance</item>
     </style>
 
-    <style name="myCustomMenuTextApearance" parent="@android:style/TextAppearance.Widget.IconMenu.Item">
-        <item name="android:textColor">@android:color/white</item>
+    <style name="PrefStyle" parent="DarkTheme">
+        <item name="android:textColor">@color/black</item>
+        <item name="android:color">@color/black</item>
+        <item name="android:textColorPrimary">@color/black</item>
     </style>
 
 </resources>

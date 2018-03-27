@@ -23,84 +23,68 @@ import ru.iris.models.protocol.data.DataSubChannelLevel;
 import ru.iris.terminal.R;
 import ru.iris.terminal.activity.MainActivity;
 import ru.iris.terminal.httpapi.DeviceService;
+import ru.iris.terminal.tasks.GetDeviceOperation;
 
 import static ru.iris.terminal.activity.MainActivity.TAG;
 
 public class BinaryTwoKeySwitchFragment implements FragmentHandler {
     private boolean enabled1 = false;
     private boolean enabled2 = false;
-    private Device device;
+    private DeviceService.DeviceIdent deviceIdent;
     private ImageButton lamp1;
     private ImageButton lamp2;
+    private TextView nameLabel;
     private final DeviceService deviceService = DeviceService.getInstance();
 
     @Override
-    public View handle(LayoutInflater inflater, ViewGroup container, Device device) {
-        this.device = device;
+    public void updateData(DeviceService.DeviceIdent deviceIdent) {
+        updateDevice(deviceIdent);
+    }
+
+    @Override
+    public void stop() {
+        EventBus.getDefault().unregister(this);
+    }
+
+    @Override
+    public View handle(LayoutInflater inflater, ViewGroup container, DeviceService.DeviceIdent deviceIdent) {
+        this.deviceIdent = deviceIdent;
 
         EventBus.getDefault().register(this);
 
         View view = inflater.inflate(R.layout.binarytwokeyswitch, container, false);
-        TextView nameLabel = view.findViewById(R.id.name);
+        nameLabel = view.findViewById(R.id.name);
         lamp1 = view.findViewById(R.id.toggle1);
         lamp2 = view.findViewById(R.id.toggle2);
 
         lamp1.setOnClickListener(listener);
         lamp2.setOnClickListener(listener2);
 
-        nameLabel.setText(device.getHumanReadable());
-
-        DeviceValue level1 = device.getValues().get("level1");
-        DeviceValue level2 = device.getValues().get("level2");
-
-        if(level1 != null && level1.getCurrentValue() != null) {
-            if(level1.getCurrentValue().equals("255")) {
-                enabled1 = true;
-                lamp1.setBackgroundResource(R.drawable.lampon);
-            } else {
-                enabled1 = false;
-                lamp1.setBackgroundResource(R.drawable.lampoff);
-            }
-        }
-
-        if(level2 != null && level2.getCurrentValue() != null) {
-            if(level2.getCurrentValue().equals("255")) {
-                enabled2 = true;
-                lamp2.setBackgroundResource(R.drawable.lampon);
-            } else {
-                enabled2 = false;
-                lamp2.setBackgroundResource(R.drawable.lampoff);
-            }
-        }
+        updateDevice(deviceIdent);
 
         return view;
     }
 
     @Subscribe
-    public void onMessageEvent(Event event) {
-        Log.d(TAG, "Event come to binary two key switch fragment");
-
-        if(event instanceof DeviceChangeEvent) {
-            DeviceChangeEvent e = (DeviceChangeEvent) event;
-
-            if(e.getProtocol().equals(device.getSource()) && e.getChannel().equals(device.getChannel()) && e.getData() instanceof DataSubChannelLevel) {
-                DataSubChannelLevel dataLevel = (DataSubChannelLevel) e.getData();
-                if(dataLevel.getSubChannel() == 1) {
-                    if (dataLevel.getTo().equals("255")) {
-                        enabled1 = true;
-                        lamp1.setBackgroundResource(R.drawable.lampon);
-                    } else {
-                        enabled1 = false;
-                        lamp1.setBackgroundResource(R.drawable.lampoff);
-                    }
+    public void onMessageEvent(DeviceChangeEvent e) {
+        if(e.getProtocol().equals(deviceIdent.getSource()) && e.getChannel().equals(deviceIdent.getChannel())) {
+            Log.d(TAG, "Event come to binary two key switch fragment");
+            DataSubChannelLevel dataLevel = (DataSubChannelLevel) e.getData();
+            if (dataLevel.getSubChannel() == 1) {
+                if (dataLevel.getTo().equals("255")) {
+                    enabled1 = true;
+                    lamp1.setBackgroundResource(R.drawable.lampon);
                 } else {
-                    if (dataLevel.getTo().equals("255")) {
-                        enabled2 = true;
-                        lamp2.setBackgroundResource(R.drawable.lampon);
-                    } else {
-                        enabled2 = false;
-                        lamp2.setBackgroundResource(R.drawable.lampoff);
-                    }
+                    enabled1 = false;
+                    lamp1.setBackgroundResource(R.drawable.lampoff);
+                }
+            } else {
+                if (dataLevel.getTo().equals("255")) {
+                    enabled2 = true;
+                    lamp2.setBackgroundResource(R.drawable.lampon);
+                } else {
+                    enabled2 = false;
+                    lamp2.setBackgroundResource(R.drawable.lampoff);
                 }
             }
         }
@@ -146,13 +130,50 @@ public class BinaryTwoKeySwitchFragment implements FragmentHandler {
         }
     };
 
+    private void updateDevice(DeviceService.DeviceIdent deviceIdent) {
+        this.deviceIdent = deviceIdent;
+        Device device = null;
+        try {
+            device = new GetDeviceOperation().execute(deviceIdent).get();
+        } catch (InterruptedException | ExecutionException e) {
+            Log.d(TAG, "ERROR: " + e.getMessage());
+        }
+
+        if(device != null) {
+            nameLabel.setText(device.getHumanReadable());
+
+            DeviceValue level1 = device.getValues().get("level1");
+            DeviceValue level2 = device.getValues().get("level2");
+
+            if(level1 != null && level1.getCurrentValue() != null) {
+                if(level1.getCurrentValue().equals("255")) {
+                    enabled1 = true;
+                    lamp1.setBackgroundResource(R.drawable.lampon);
+                } else {
+                    enabled1 = false;
+                    lamp1.setBackgroundResource(R.drawable.lampoff);
+                }
+            }
+
+            if(level2 != null && level2.getCurrentValue() != null) {
+                if(level2.getCurrentValue().equals("255")) {
+                    enabled2 = true;
+                    lamp2.setBackgroundResource(R.drawable.lampon);
+                } else {
+                    enabled2 = false;
+                    lamp2.setBackgroundResource(R.drawable.lampoff);
+                }
+            }
+        }
+    }
+
     private class DeviceOperation extends AsyncTask<String, Void, Void> {
         @Override
         protected Void doInBackground(String... params) {
-            Log.d(MainActivity.TAG, "Set level " + params[0] + " to device " + device.getHumanReadable() + ", subchannel: " + params[1]);
+            Log.d(MainActivity.TAG, "Set level " + params[0] + " to device " + deviceIdent.getChannel() + ", subchannel: " + params[1]);
 
             try {
-                deviceService.setDeviceLevel(device.getSource(), device.getChannel(), Integer.valueOf(params[1]), params[0]);
+                deviceService.setDeviceLevel(deviceIdent.getSource(), deviceIdent.getChannel(), Integer.valueOf(params[1]), params[0]);
             } catch (IOException e) {
                 Log.d(TAG, "ERROR: " + e.getMessage());
             }

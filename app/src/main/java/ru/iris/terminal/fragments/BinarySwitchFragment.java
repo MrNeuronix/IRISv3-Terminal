@@ -22,60 +22,79 @@ import ru.iris.models.protocol.data.DataLevel;
 import ru.iris.terminal.R;
 import ru.iris.terminal.activity.MainActivity;
 import ru.iris.terminal.httpapi.DeviceService;
+import ru.iris.terminal.tasks.GetDeviceOperation;
 
 import static ru.iris.terminal.activity.MainActivity.TAG;
 
 public class BinarySwitchFragment implements FragmentHandler {
     private boolean enabled = false;
-    private Device device;
+    private DeviceService.DeviceIdent deviceIdent;
     private ImageButton lamp;
+    private TextView nameLabel;
     private final DeviceService deviceService = DeviceService.getInstance();
 
     @Override
-    public View handle(LayoutInflater inflater, ViewGroup container, Device device) {
-        this.device = device;
+    public View handle(LayoutInflater inflater, ViewGroup container, DeviceService.DeviceIdent deviceIdent) {
+        this.deviceIdent = deviceIdent;
 
         EventBus.getDefault().register(this);
 
         View view = inflater.inflate(R.layout.binaryswitch, container, false);
-        TextView nameLabel = view.findViewById(R.id.name);
+        nameLabel = view.findViewById(R.id.name);
         lamp = view.findViewById(R.id.toggle);
-
         lamp.setOnClickListener(listener);
 
-        nameLabel.setText(device.getHumanReadable());
-
-        DeviceValue level = device.getValues().get("level");
-
-        if(level != null && level.getCurrentValue() != null) {
-            if(level.getCurrentValue().equals("255")) {
-                enabled = true;
-                lamp.setBackgroundResource(R.drawable.lampon);
-            } else {
-                enabled = false;
-                lamp.setBackgroundResource(R.drawable.lampoff);
-            }
-        }
+        updateDevice(deviceIdent);
 
         return view;
     }
 
-    @Subscribe
-    public void onMessageEvent(Event event) {
-        Log.d(TAG, "Event come to binary switch fragment");
+    @Override
+    public void stop() {
+        EventBus.getDefault().unregister(this);
+    }
 
-        if(event instanceof DeviceChangeEvent) {
-            DeviceChangeEvent e = (DeviceChangeEvent) event;
+    @Override
+    public void updateData(DeviceService.DeviceIdent deviceIdent) {
+        updateDevice(deviceIdent);
+    }
 
-            if(e.getProtocol().equals(device.getSource()) && e.getChannel().equals(device.getChannel()) && e.getData() instanceof DataLevel) {
-                DataLevel dataLevel = (DataLevel) e.getData();
-                if(dataLevel.getTo().equals("255")) {
+    private void updateDevice(DeviceService.DeviceIdent deviceIdent) {
+        this.deviceIdent = deviceIdent;
+        Device device = null;
+        try {
+            device = new GetDeviceOperation().execute(deviceIdent).get();
+        } catch (InterruptedException | ExecutionException e) {
+            Log.d(TAG, "ERROR: " + e.getMessage());
+        }
+
+        if(device != null) {
+            nameLabel.setText(device.getHumanReadable());
+            DeviceValue level = device.getValues().get("level");
+
+            if(level != null && level.getCurrentValue() != null) {
+                if(level.getCurrentValue().equals("255")) {
                     enabled = true;
                     lamp.setBackgroundResource(R.drawable.lampon);
                 } else {
                     enabled = false;
                     lamp.setBackgroundResource(R.drawable.lampoff);
                 }
+            }
+        }
+    }
+
+    @Subscribe
+    public void onMessageEvent(DeviceChangeEvent e) {
+        if(e.getProtocol().equals(deviceIdent.getSource()) && e.getChannel().equals(deviceIdent.getChannel())) {
+            Log.d(TAG, "Event come to binary switch fragment");
+            DataLevel dataLevel = (DataLevel) e.getData();
+            if(dataLevel.getTo().equals("255")) {
+                enabled = true;
+                lamp.setBackgroundResource(R.drawable.lampon);
+            } else {
+                enabled = false;
+                lamp.setBackgroundResource(R.drawable.lampoff);
             }
         }
     }
@@ -103,10 +122,10 @@ public class BinarySwitchFragment implements FragmentHandler {
     private class DeviceOperation extends AsyncTask<String, Void, Void> {
         @Override
         protected Void doInBackground(String... params) {
-            Log.d(MainActivity.TAG, "Set level " + params[0] + " to device " + device.getHumanReadable());
+            Log.d(MainActivity.TAG, "Set level " + params[0] + " to deviceIdent " + deviceIdent.getChannel());
 
             try {
-                deviceService.setDeviceLevel(device.getSource(), device.getChannel(), null, params[0]);
+                deviceService.setDeviceLevel(deviceIdent.getSource(), deviceIdent.getChannel(), null, params[0]);
             } catch (IOException e) {
                 Log.d(TAG, "ERROR: " + e.getMessage());
             }
@@ -114,5 +133,4 @@ public class BinarySwitchFragment implements FragmentHandler {
             return null;
         }
     }
-
 }
